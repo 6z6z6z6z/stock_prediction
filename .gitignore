@@ -1,0 +1,42 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Environments and local config
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Generated outputs and heavy artifacts
+outputs/
+*.pkl
+*.pt
+*.pth
+*.joblib
+*.onnx
+*.ckpt
+
+# Local datasets
+A股数据/
+data/
+raw_data/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+~$*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,2 @@
+trade_date,ts_code,name,action,filled_price,filled_shares,filled_amount,status,reason
+20260428,002029.SZ,example,buy,0,0,0,pending,

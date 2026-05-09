@@ -1,0 +1,27 @@
+data_dir: ../A股数据
+output_dir: outputs/daily_test
+report_dir: outputs/agent_reports
+log_file: outputs/trading_log.csv
+
+start_date: 20230101
+market_mode: no_star
+min_amount: 50000
+n: 8
+k: 1
+max_per_industry: 1
+
+checkpoints:
+  - outputs/mlp_checkpoint_2023.pt
+  - outputs/mlp_checkpoint_2023_seed7.pt
+  - outputs/mlp_checkpoint_2023_seed42.pt
+
+strategy_name: 3-seed MLP ensemble, no_star, n=8, k=1, industry_cap=1
+fallback_rule: If a buy candidate cannot be filled, use the next filtered candidate that keeps industry constraints.
+human_confirm_required: true
+
+llm_enabled: false
+llm_provider: deepseek
+llm_model: deepseek-v4-pro
+llm_api_key_env: DEEPSEEK_API_KEY
+llm_max_candidates: 30
+llm_max_chinext: 5
