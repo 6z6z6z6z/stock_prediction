@@ -2,9 +2,36 @@
 
 This project implements a reproducible baseline for the deep learning stock trend prediction assignment.
 
+## Current Status
+
+Status date: `2026-05-09`.
+
+- Local daily data is available through `20260508.csv`.
+- The latest completed local live-ensemble comparison in this repository was run on `20260506` data.
+- Generated feature files, checkpoints, prediction CSVs, and rebalance plans live under `outputs/` and are intentionally ignored by Git.
+- Before using the project for a new contest/trading day, regenerate features and live outputs with the latest available data date.
+- Commands and metrics that mention `20260428`, `20260420`, or `20260506` below are historical experiment records unless they are in the current live workflow section.
+
 ## Quick Start
 
 From `D:\Deep Learning\stock_prediction`:
+
+```powershell
+# Example for the currently available local data date.
+python scripts\prepare_features.py --data-dir "..\A股数据" --start-date 20230101 --end-date 20260508 --target-mode close --output outputs\features_live_20260508.pkl
+
+python scripts\train_live_ensemble.py --feature-file outputs\features_live_20260508.pkl --output-dir outputs\live_ensemble_20260508 --prefix live_close --seeds 2026 7 42 --val-days 20 --epochs 8 --eval-ret-mode open2open --market-mode no_star --min-amount 50000 --plan-n 8 --plan-k 1 --max-per-industry 1
+
+python scripts\run_blended_daily_pipeline.py --data-dir "..\A股数据" --output-dir outputs\daily_blend --live-checkpoints outputs\live_ensemble_20260508\live_close_seed2026.pt outputs\live_ensemble_20260508\live_close_seed7.pt outputs\live_ensemble_20260508\live_close_seed42.pt --weights old:0.9,live:0.1 --n 8 --k 1 --max-per-industry 1 --market-mode no_star --ret-mode all --min-amount 50000
+```
+
+If `--live-checkpoints` is omitted, `run_blended_daily_pipeline.py` auto-discovers the newest `outputs/live_ensemble_YYYYMMDD` directory that contains `live_close_seed*.pt` files.
+
+`old:0.9,live:0.1` was the best checked blend on the 2026-05-06 validation comparison. Re-run `scripts/evaluate_score_blend_grid.py` after a material data or model update if time allows.
+
+## Historical Experiment Commands
+
+The following commands reproduce earlier baselines and are kept for auditability. They are not the current live runbook.
 
 ```powershell
 python scripts\prepare_features.py --data-dir "..\A股数据" --start-date 20230101 --end-date 20260428 --output outputs\features_2023.pkl
@@ -51,7 +78,7 @@ Use a shorter date range first for smoke tests, then expand to 2019 onward.
 
 ## Data Alignment
 
-Rows are keyed by `signal_date`. Features on day `t` only use data available up to day `t`. The default target is next close-to-close return:
+Rows are keyed by `trade_date`. Features on day `t` only use data available up to day `t`. The default target is next close-to-close return:
 
 ```text
 future_ret_1 = close[t + 1] / close[t] - 1
@@ -81,7 +108,7 @@ The latest day can be predicted even when `future_ret_1` is not available.
 - `scripts/evaluate_aux_filter_grid.py`: use an auxiliary model score as a daily percentile filter while ranking by the base score.
 - `scripts/retarget_features.py`: reuse an existing feature file and rebuild `target` for `close`, `open2open`, or `intraday`.
 
-## Current Baseline
+## Historical Baselines
 
 Backtest metrics now include both `total_return` and `annual_return`. The annualized value is computed as:
 
@@ -143,7 +170,7 @@ Open-to-open validation after these constraints:
 
 The same default `no_star + industry_cap=1, n=8,k=1` result is `49.8%` total return over 69 validation trading days. The annualized `337.8%` is only the 252-day extrapolation of that 69-day result.
 
-The current final contest file is:
+The historical 2026-04-28 final contest file was:
 
 ```text
 outputs/rebalance_plan_final_n8_no_star_industry1.csv
@@ -170,31 +197,37 @@ python scripts\train_gbdt_sidecar.py --feature-file outputs\features_2023_open2o
 
 The local environment does not currently have `lightgbm` or `catboost`, so the script used sklearn `HistGradientBoostingRegressor`. It did not beat the close ensemble, and blending it into the close ensemble reduced Top5/Top8 trading returns. Keep it as a sidecar experiment only.
 
-Daily contest command:
+Legacy deterministic daily command:
 
 ```powershell
 python scripts\run_daily_pipeline.py --data-dir "..\A股数据" --output-dir outputs\daily --n 8 --k 1 --max-per-industry 1 --market-mode no_star --min-amount 50000
 ```
 
-Latest blended contest workflow:
+Use this only when you want the original fixed-checkpoint pipeline for comparison. The preferred contest workflow is the blended live pipeline shown in Quick Start.
+
+Latest completed blended comparison:
 
 ```powershell
+python scripts\prepare_features.py --data-dir "..\A股数据" --start-date 20230101 --end-date 20260506 --target-mode close --output outputs\features_live_20260506.pkl
 python scripts\train_live_ensemble.py --feature-file outputs\features_live_20260506.pkl --output-dir outputs\live_ensemble_20260506 --prefix live_close --seeds 2026 7 42 --val-days 20 --epochs 8 --eval-ret-mode open2open --market-mode no_star --min-amount 50000 --plan-n 8 --plan-k 1 --max-per-industry 1
-python scripts\run_blended_daily_pipeline.py --data-dir "..\A股数据" --output-dir outputs\daily_blend --weights old:0.9,live:0.1 --n 8 --k 1 --max-per-industry 1 --market-mode no_star --ret-mode all --min-amount 50000
+python scripts\run_blended_daily_pipeline.py --data-dir "..\A股数据" --output-dir outputs\daily_blend --live-checkpoints outputs\live_ensemble_20260506\live_close_seed2026.pt outputs\live_ensemble_20260506\live_close_seed7.pt outputs\live_ensemble_20260506\live_close_seed42.pt --weights old:0.9,live:0.1 --n 8 --k 1 --max-per-industry 1 --market-mode no_star --ret-mode all --min-amount 50000
 ```
 
-The latest 2026-05-06 comparison favored rank-normalized blending of the old close ensemble and latest-data live ensemble:
+The 2026-05-06 comparison favored rank-normalized blending of the old close ensemble and latest-data live ensemble:
 
 - Old close ensemble, `n=8,k=1,industry_cap=1`, 2026-04-02 to 2026-04-30 open-to-open total return: about `7.3%`.
 - Latest-data live ensemble improved Rank IC and reached about `7.7%` strategy total return on the same check.
 - Blend `old=0.9, live=0.1` improved the same open-to-open low-turnover check to about `15.5%` total return, Sharpe about `6.10`, max drawdown about `-1.7%`.
-- The current blended 2026-05-06 plan is `outputs/live_ensemble_20260506/rebalance_plan_blend_old90_live10_n8_industry1_20260506.csv`.
+- The historical blended 2026-05-06 plan is `outputs/live_ensemble_20260506/rebalance_plan_blend_old90_live10_n8_industry1_20260506.csv`.
+- Because local data now extends to `20260508`, regenerate the live ensemble before treating any plan as current.
 
 Agent harness command:
 
 ```powershell
 python scripts\agent_daily.py --config config\agent_config.yaml
 ```
+
+`agent_daily.py` currently wraps the legacy deterministic `run_daily_pipeline.py` output format. For the better-scoring blended workflow, run `run_blended_daily_pipeline.py` first and use `scan_candidate_news.py` on the blended rebalance plan until the agent harness is extended for blended outputs.
 
 Optional LLM decision layer:
 
@@ -251,5 +284,5 @@ python scripts\record_fills.py --fills 今日成交.csv --summary outputs\daily\
 
 ## Notes
 
-- `lightgbm` is optional and not required for the current baseline.
+- `lightgbm` is optional and not required for the historical baseline.
 - Generated model checkpoints and feature files are working artifacts. The assignment says model weights and raw data do not need to be submitted.

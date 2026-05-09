@@ -16,11 +16,12 @@ def parse_args() -> argparse.Namespace:
         "outputs/mlp_checkpoint_2023_seed7.pt",
         "outputs/mlp_checkpoint_2023_seed42.pt",
     ])
-    parser.add_argument("--live-checkpoints", nargs="+", default=[
-        "outputs/live_ensemble_20260506/live_close_seed2026.pt",
-        "outputs/live_ensemble_20260506/live_close_seed7.pt",
-        "outputs/live_ensemble_20260506/live_close_seed42.pt",
-    ])
+    parser.add_argument(
+        "--live-checkpoints",
+        nargs="+",
+        default=None,
+        help="Live ensemble checkpoints. Defaults to the newest outputs/live_ensemble_YYYYMMDD directory.",
+    )
     parser.add_argument("--weights", default="old:0.9,live:0.1")
     parser.add_argument("--val-start", default="20260402")
     parser.add_argument("--val-end", default="20260430")
@@ -43,6 +44,30 @@ def latest_daily_date(data_dir: Path) -> str:
     return files[-1].stem
 
 
+def discover_latest_live_checkpoints(outputs_root: Path = Path("outputs")) -> list[str]:
+    live_dirs = []
+    for path in outputs_root.glob("live_ensemble_*"):
+        suffix = path.name.removeprefix("live_ensemble_")
+        if path.is_dir() and suffix.isdigit():
+            live_dirs.append(path)
+    live_dirs.sort(key=lambda path: path.name, reverse=True)
+
+    preferred_seeds = [2026, 7, 42]
+    for live_dir in live_dirs:
+        preferred = [live_dir / f"live_close_seed{seed}.pt" for seed in preferred_seeds]
+        if all(path.exists() for path in preferred):
+            return [str(path) for path in preferred]
+
+        found = sorted(live_dir.glob("live_close_seed*.pt"))
+        if found:
+            return [str(path) for path in found]
+
+    raise FileNotFoundError(
+        "No live ensemble checkpoints found. Run scripts/train_live_ensemble.py first "
+        "or pass --live-checkpoints explicitly."
+    )
+
+
 def run(cmd: list[str]) -> None:
     print(" ".join(cmd))
     subprocess.run(cmd, check=True)
@@ -54,6 +79,7 @@ def main() -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     end_date = latest_daily_date(data_dir)
+    live_checkpoints = args.live_checkpoints or discover_latest_live_checkpoints()
 
     feature_file = out_dir / f"features_{end_date}.pkl"
     old_val = out_dir / f"old_validation_{end_date}.csv"
@@ -105,7 +131,7 @@ def main() -> None:
         "scripts/predict_ensemble.py",
         *common_predict_args,
         "--checkpoints",
-        *args.live_checkpoints,
+        *live_checkpoints,
         "--output",
         str(live_val),
         "--latest-output",
